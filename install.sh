@@ -1,85 +1,38 @@
 #!/bin/bash
-# Auto install for 8192cu
-# September, 1 2010 v1.0.0, willisTang
-# 
-# Add make_drv to select chip type
-# Novembor, 21 2011 v1.1.0, Jeff Hung
-################################################################################
 
-echo "##################################################"
-echo "Realtek Wi-Fi driver Auto installation script"
-echo "Novembor, 21 2011 v1.1.0"
-echo "##################################################"
+echo "Realtek Wi-Fi driver Auto install script"
+echo "Datum: Mei 2025"
 
-################################################################################
-#			Decompress the driver source tal ball
-################################################################################
-cd driver
-#Drvfoulder=`ls |grep .tar.gz`
-#echo "Decompress the driver source tar ball:"
-#Eecho "	"$Drvfoulder
-#tar zxvf $Drvfoulder
+# Stap 1: Ga naar de driver map
+cd driver || { echo "Map driver niet gevonden!"; exit 1; }
 
-#Drvfoulder=`ls |grep -iv '.tar.gz'`
-#echo "$Drvfoulder"
-#cd  $Drvfoulder
-cd module
-################################################################################
-#			If makd_drv exixt, execute it to select chip type
-################################################################################
-if [ -e ./make_drv ]; then
-	./make_drv
+# Stap 2: Pak de broncode uit als er een tar.gz is
+tarball=$(ls *.tar.gz 2>/dev/null)
+if [ -n "$tarball" ]; then
+  echo "Uitpakken van $tarball..."
+  tar -zxvf "$tarball" || { echo "Uitpakken mislukt!"; exit 1; }
 fi
 
-################################################################################
-#                       make clean
-################################################################################
-#echo "Authentication requested [root] for make clean:"
-#if [ "`uname -r |grep fc`" == " " ]; then
-#        sudo su -c "make clean"; Error=$?
-#else
-#        su -c "make clean"; Error=$?
-#fi
+# Stap 3: Ga naar de uitgepakte map (neem aan dat er één is)
+driver_folder=$(ls -d */ | head -n 1)
+cd "$driver_folder" || { echo "Driver map niet gevonden!"; exit 1; }
 
-################################################################################
-#			Compile the driver
-################################################################################
-echo "Authentication requested [root] for make driver:"
-if [ "`uname -r |grep fc`" == " " ]; then
-	sudo su -c make; Error=$?
-else	
-	su -c make; Error=$?
-fi
-################################################################################
-#			Check whether or not the driver compilation is done
-################################################################################
-module=`ls |grep -i 'ko'`
-echo "##################################################"
-if [ "$Error" != 0 ];then
-	echo "Compile make driver error: $Error"
-	echo "Please check error Mesg"
-	echo "##################################################"
-	exit
-else
-	echo "Compile make driver ok!!"	
-	echo "##################################################"
-fi
+# Stap 4: Schoon oude builds op
+echo "Oude builds schoonmaken..."
+make clean
 
-if [ "`uname -r |grep fc`" == " " ]; then
-	echo "Authentication requested [root] for remove driver:"
-	sudo su -c "rmmod $module"
-	echo "Authentication requested [root] for insert driver:"
-	sudo su -c "insmod $module"
-	echo "Authentication requested [root] for install driver:"
-	sudo su -c "make install"
-else
-	echo "Authentication requested [root] for remove driver:"
-	su -c "rmmod $module"
-	echo "Authentication requested [root] for insert driver:"
-	su -c "insmod $module"
-	echo "Authentication requested [root] for install driver:"
-	su -c "make install"
-fi
-echo "##################################################"
-echo "The Setup Script is completed !"
-echo "##################################################"
+# Stap 5: Build de driver
+echo "Bouwen van driver..."
+make || { echo "Build mislukt!"; exit 1; }
+
+# Stap 6: Installeer de driver
+echo "Installeren van driver..."
+sudo make install || { echo "Installatie mislukt!"; exit 1; }
+
+# Stap 7: Laad de module opnieuw
+module_name="rtl8723bs"
+echo "Herladen van module $module_name..."
+sudo modprobe -r $module_name
+sudo modprobe $module_name
+
+echo "Installatie voltooid! Herstart je computer als het nog niet werkt."
